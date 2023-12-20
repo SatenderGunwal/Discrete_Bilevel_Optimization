@@ -12,6 +12,7 @@ def GBP_CUT( problem_data ):
     model = Model("General Binary Bilevel Solver")
     model.setPresolve(SCIP_PARAMSETTING.OFF)
     model.setHeuristics(SCIP_PARAMSETTING.OFF)
+    
 
     # model.hideOutput(False)
     model.setParam('limits/time', 3600)
@@ -34,7 +35,7 @@ def GBP_CUT( problem_data ):
     conshdlr = Constraint_Handler(X,Y)
     # conshdlr.data = XDim, YDim, Dy, A, B, C
     conshdlr.data = problem_data, XDim, YDim
-    model.includeConshdlr(conshdlr,  "GBP", "Constraint handler for GBP", needscons = False)
+    model.includeConshdlr(conshdlr,  "GBP", "Constraint handler for GBP", needscons = False) # needscons: "should the constraint handler be skipped, if no constraints are available?"
 
     model.optimize()
     obj = model.getObjVal()
