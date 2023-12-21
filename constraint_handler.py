@@ -43,6 +43,46 @@ class Constraint_Handler(Conshdlr):
                 yt = self.model.getSolVal(sol, self.Y[f"{idx}"])
                 Y_sol.append(yt)
 
+            def getLPBasis():
+                # Setting Basic Variables Indexes
+                constraints_ = self.model.getConss()
+                print("\nLP Rows = ", self.model.getNLPRows())
+                print(constraints_)
+                NumConstrs_  = 10#len(constraints_)#self.model.getNLPRows()
+                Non_zero_idx = []
+                Zero_idx     = []
+
+                sol_ = X_sol + Y_sol
+
+                print("Current Solution = ", sol_)
+
+                for idx,val in enumerate(sol_):
+                    if val > 0:
+                        Non_zero_idx.append(idx)
+                    else:
+                        Zero_idx.append(idx)
+                print("Num_Constr", NumConstrs_)
+                # for row_ in self.model.getLPRowsData():
+                #     print("\nLP Rows data = ", row_.getLhs(), row_.getRhs())
+                zero_needed = NumConstrs_ - len(Non_zero_idx)
+                print("Needed = ", zero_needed)
+
+                if zero_needed > 0:
+                    BasisIndexes = Non_zero_idx + Zero_idx[:zero_needed]
+                else:
+                    print("Basic vars more than constraints ....")
+                    print("X = ", sol_[:XDim])
+                    print("Y = ", sol_[XDim:])
+                    BasisIndexes = Non_zero_idx
+                BasisIndexes.sort()
+                print("\nNum of Basic Vars = ", len(BasisIndexes))
+
+                return BasisIndexes
+
+
+            # 
+            # print("\nconstraints_  = ",constraints_)
+            
             # print("Current Solution = ", X_sol, Y_sol,"\n")
             # Getting Optimal Y for current X solution.
             Optimal_Y, FMILP_Objective = self.FMILP( X_sol )
@@ -59,13 +99,13 @@ class Constraint_Handler(Conshdlr):
                     return True # Will cut be added for this solution
                 else:
                     # Getting Variable Basis Info
-                    BasisInfo = self.model.getLPBasisInd() # "Gets all indices of basic columns and rows: index i >= 0 corresponds to column i, index i < 0 to row -i-1"
-                    VarBasisInfo = []
-                    for idx in BasisInfo:
-                        if idx >= 0 : VarBasisInfo.append(idx)
-                    VarBasisInfo.sort()
+                    # BasisInfo = self.model.getLPBasisInd() # "Gets all indices of basic columns and rows: index i >= 0 corresponds to column i, index i < 0 to row -i-1" 
+                    VarBasisInfo = getLPBasis()
+                    # for idx in BasisInfo:
+                    #     if idx >= 0 : VarBasisInfo.append(idx)
+                    # VarBasisInfo.sort()
 
-                    print("Basis Info", BasisInfo, VarBasisInfo)
+                    # print("Basis Info", BasisInfo, VarBasisInfo)
 
                     # Getting B inverse * A matrix. (This can be approximated using numerical methods instead)
                     current_lp_rows = self.model.getNLPRows() # Retrieving current number of rows in LP.

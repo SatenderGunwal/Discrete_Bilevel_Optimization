@@ -12,10 +12,9 @@ def GBP_CUT( problem_data ):
     model = Model("General Binary Bilevel Solver")
     model.setPresolve(SCIP_PARAMSETTING.OFF)
     model.setHeuristics(SCIP_PARAMSETTING.OFF)
-    
 
     # model.hideOutput(False)
-    model.setParam('limits/time', 3600)
+    model.setParam('limits/time', 2)
 
     X = { f"{i}":model.addVar(vtype="B", name=f"X{i}") for i in range(XDim) }
     Y = { f"{i}":model.addVar(vtype="B", name=f"Y{i}") for i in range(YDim) }

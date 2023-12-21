@@ -33,7 +33,7 @@ class Intersection_Cuts:
         row_num = 0
         violated_row_indexes = []
         for row in self.A:
-            if row @ self.HPR_Solution_X >= Bilevel_Free_RHS[row_num]:
+            if row @ self.HPR_Solution_X <= Bilevel_Free_RHS[row_num]:
                 violated_row_indexes.append(row_num)
             row_num += 1
         A_subarray = np.take(self.A, violated_row_indexes, axis=0) # Getting Violated A rows
@@ -41,7 +41,7 @@ class Intersection_Cuts:
         # Y-Related Constraint Violation Check
         XDim, YDim        = len(self.Cx), len(self.Cy)
         Y_constr_violated = False
-        if self.Dy @ self.HPR_Solution_Y <= DyHat:
+        if self.Dy @ self.HPR_Solution_Y >= DyHat:
             Y_constr_violated = True
 
         # _______ Compiling Violated Row Data from bilevel free set ______________
@@ -72,14 +72,14 @@ class Intersection_Cuts:
         Final_LHS, Final_RHS = self.Bilevel_Free_Disjunction()
         A_hat, B_hat         = self.ABHatMatrix()
         Combined_RHS         = np.concatenate((self.G0, self.C), axis=0)
-        B_hat_pseudoinverse  = np.linalg.pinv(B_hat)
+        B_hat_pseudoinverse  = np.linalg.inv(B_hat)
         print("\nPseudo_B_inverse = ", B_hat_pseudoinverse)
-        print("\nScip_B_inverse = ", self.BInv_Matrix, self.BInv_Matrix.shape)
+        # print("\nScip_B_inverse = ", self.BInv_Matrix, self.BInv_Matrix.shape)
 
         # Code Line 1-3 from Algorithm 1(IC Separation) from Fischetti
         num_disjunctions = Final_LHS.shape[0]
         for row_num in range(num_disjunctions):
-            older_lhs = Final_LHS[row_num]
+            older_lhs = np.array([list(Final_LHS[row_num])])#Final_LHS[row_num]
             older_rhs = Final_RHS[row_num]
             U_i       = np.take(older_lhs, self.BasisIndexes, axis=1) @ B_hat_pseudoinverse
             Final_LHS[row_num] = older_lhs - U_i @ A_hat
