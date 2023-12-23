@@ -10,7 +10,7 @@ class Constraint_Handler(Conshdlr):
 
     def FMILP(self, HPR_Solution_X ):
 
-        problem_data, XDim, YDim = self.data
+        problem_data, XDim, YDim, _ = self.data
         [A, B, C, Dy]            = problem_data[-5:-1]
 
         m = Model("General Binary Bilevel Solver")
@@ -31,8 +31,10 @@ class Constraint_Handler(Conshdlr):
 
     def addcut(self, checkonly, sol):
 
-            problem_data, XDim, YDim = self.data
+            problem_data, XDim, YDim, storage = self.data
             [A, B, C, Dy]            = problem_data[-5:-1]
+
+
             # Getting the solutions at current node
             X_sol, Y_sol = [], []
             for idx in range(XDim):
@@ -44,11 +46,24 @@ class Constraint_Handler(Conshdlr):
                 Y_sol.append(yt)
 
             def getLPBasis():
+
                 # Setting Basic Variables Indexes
                 constraints_ = self.model.getConss()
                 print("\nLP Rows = ", self.model.getNLPRows())
                 print(constraints_)
-                print("No of actual constraints = ", len(constraints_))
+                print("\nNCOnss = ",self.model.getNConss())
+                print("\nNo of actual constraints = ", len(constraints_))
+                # for con in constraints_:
+                #     print("\nGetting the Lhs : ", self.model.getLhs(con))
+                lprowdata = self.model.getLPRowsData() #getLPColsData, getDualSolVal(constraint)
+                print("\nCurrent rows = ", len(lprowdata))
+                for row in lprowdata:
+                    print("Row = ", self.model.printRow(row))
+
+                for con in constraints_:
+                    print("\nlhs-rhs = ", self.model.getLhs(con), self.model.getRhs(con))
+                    print("Coeffs = ", self.model.getValsLinear(con))
+
                 NumConstrs_  = 10 #len(constraints_)#self.model.getNLPRows()
                 Non_zero_idx = []
                 Zero_idx     = []
@@ -80,8 +95,6 @@ class Constraint_Handler(Conshdlr):
 
                 return BasisIndexes
 
-
-            # 
             # print("\nconstraints_  = ",constraints_)
             
             # print("Current Solution = ", X_sol, Y_sol,"\n")
@@ -93,6 +106,7 @@ class Constraint_Handler(Conshdlr):
             ConsCheck = Dy @ np.array(Y_sol) - FMILP_Objective
             # print(ConsCheck, checkonly, self.model.getSolObjVal(sol) )
             # print(self.model.getNLPCols(), self.model.getNLPRows(), self.model.getNVars() )
+            
             # Adding Cut
             cutsadded  = False
             if ConsCheck > 0: # => Bilevel Infeasible Solution
@@ -115,6 +129,14 @@ class Constraint_Handler(Conshdlr):
                         BInv.append( self.model.getLPBInvRow(row_num) ) # Gives row of B^(-1)*A matrix for basis matrix B.
                     BInv = np.array(BInv)
 
+                    # lprowdata = self.model.getLPRowsData() #getLPColsData, getDualSolVal(constraint)
+                    #getLhs(const)
+
+                    
+
+
+
+
                     # # Checking Error
                     # if BInv.shape[0] != len(VarBasisInfo):
                     #     print("Basis solution error", BInv.shape)
@@ -123,6 +145,7 @@ class Constraint_Handler(Conshdlr):
                     # Add cut here
                     ICObject = Intersection_Cuts( problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo, BInv)
                     ICVector = ICObject.Cut()
+                   
                     self.model.addCons( quicksum( ICVector[idx]*self.X[f'{idx}'] for idx in range(XDim)) + quicksum( ICVector[XDim+idx]*self.Y[f'{idx}'] for idx in range(YDim)) >= 1 , name='LLC' )
                     cutsadded = True
 
