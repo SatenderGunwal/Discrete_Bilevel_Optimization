@@ -48,7 +48,8 @@ class Constraint_Handler(Conshdlr):
                 constraints_ = self.model.getConss()
                 print("\nLP Rows = ", self.model.getNLPRows())
                 print(constraints_)
-                NumConstrs_  = 10#len(constraints_)#self.model.getNLPRows()
+                print("No of actual constraints = ", len(constraints_))
+                NumConstrs_  = 10 #len(constraints_)#self.model.getNLPRows()
                 Non_zero_idx = []
                 Zero_idx     = []
 
