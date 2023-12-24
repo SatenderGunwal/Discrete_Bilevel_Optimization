@@ -12,6 +12,7 @@ def GBP_CUT( problem_data ):
     model = Model("General Binary Bilevel Solver")
     model.setPresolve(SCIP_PARAMSETTING.OFF)
     model.setHeuristics(SCIP_PARAMSETTING.OFF)
+    model.setSeparating(SCIP_PARAMSETTING.OFF)
 
     # model.hideOutput(False)
     model.setParam('limits/time', 2)

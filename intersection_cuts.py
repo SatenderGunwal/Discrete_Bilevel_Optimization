@@ -2,7 +2,7 @@ import numpy as np
 
 class Intersection_Cuts:
 
-    def __init__(self, problem_data, HPR_Solution_X, HPR_Solution_Y, Optimal_Y, BasisIndexes, BInv_Matrix ):
+    def __init__(self, A, B, C, problem_data, HPR_Solution_X, HPR_Solution_Y, Optimal_Y, BasisIndexes ):
         self.Cx = problem_data[0]
         self.Cy = problem_data[1]
         self.Gx = problem_data[2]
@@ -11,13 +11,15 @@ class Intersection_Cuts:
         self.A  = problem_data[5]
         self.B  = problem_data[6]
         self.C  = problem_data[7]
+        self.ANew  = A
+        self.BNew  = B
+        self.CNew  = C
         self.Dy = problem_data[8]
         self.Optimal_Y      = Optimal_Y
         self.problem_senses = problem_data[9]
         self.HPR_Solution_X = HPR_Solution_X
         self.HPR_Solution_Y = HPR_Solution_Y
         self.BasisIndexes   = BasisIndexes
-        self.BInv_Matrix    = BInv_Matrix
 
     def Bilevel_Free_Disjunction(self): # OptY
 
@@ -60,7 +62,7 @@ class Intersection_Cuts:
     def ABHatMatrix(self):
 
         Block_1 = np.concatenate((self.Gx, self.Gy), axis=1)
-        Block_2 = np.concatenate((self.A, self.B), axis=1)
+        Block_2 = np.concatenate((self.ANew, self.BNew), axis=1)
         A_hat   = np.concatenate((Block_1, Block_2), axis=0)
         B_hat   = np.take(A_hat, self.BasisIndexes, axis=1)
 
@@ -71,10 +73,8 @@ class Intersection_Cuts:
         XDim, YDim           = len(self.Cx), len(self.Cy)
         Final_LHS, Final_RHS = self.Bilevel_Free_Disjunction()
         A_hat, B_hat         = self.ABHatMatrix()
-        Combined_RHS         = np.concatenate((self.G0, self.C), axis=0)
+        Combined_RHS         = np.concatenate((self.G0, self.CNew), axis=0)
         B_hat_pseudoinverse  = np.linalg.inv(B_hat)
-        print("\nPseudo_B_inverse = ", B_hat_pseudoinverse)
-        # print("\nScip_B_inverse = ", self.BInv_Matrix, self.BInv_Matrix.shape)
 
         # Code Line 1-3 from Algorithm 1(IC Separation) from Fischetti
         num_disjunctions = Final_LHS.shape[0]

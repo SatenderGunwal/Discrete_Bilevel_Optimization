@@ -11,7 +11,7 @@ class Constraint_Handler(Conshdlr):
     def FMILP(self, HPR_Solution_X ):
 
         problem_data, XDim, YDim, _ = self.data
-        [A, B, C, Dy]            = problem_data[-5:-1]
+        [A, B, C, Dy]               = problem_data[-5:-1]
 
         m = Model("General Binary Bilevel Solver")
         Y_ = { f"{i}":m.addVar(vtype="B", name=f"Y{i}") for i in range(YDim) }
@@ -32,8 +32,8 @@ class Constraint_Handler(Conshdlr):
     def addcut(self, checkonly, sol):
 
             problem_data, XDim, YDim, storage = self.data
-            [A, B, C, Dy]            = problem_data[-5:-1]
-
+            [Gx, Gy, G0, A, B, C, Dy] = problem_data[-8:-1]
+            init_NConstraints         = Gx.shape[0] + A.shape[0] # Number of Problem Constraints (Without Cuts)
 
             # Getting the solutions at current node
             X_sol, Y_sol = [], []
@@ -46,42 +46,19 @@ class Constraint_Handler(Conshdlr):
                 Y_sol.append(yt)
 
             def getLPBasis():
-
-                # Setting Basic Variables Indexes
-                constraints_ = self.model.getConss()
-                print("\nLP Rows = ", self.model.getNLPRows())
-                print(constraints_)
-                print("\nNCOnss = ",self.model.getNConss())
-                print("\nNo of actual constraints = ", len(constraints_))
-                # for con in constraints_:
-                #     print("\nGetting the Lhs : ", self.model.getLhs(con))
-                lprowdata = self.model.getLPRowsData() #getLPColsData, getDualSolVal(constraint)
-                print("\nCurrent rows = ", len(lprowdata))
-                for row in lprowdata:
-                    print("Row = ", self.model.printRow(row))
-
-                for con in constraints_:
-                    print("\nlhs-rhs = ", self.model.getLhs(con), self.model.getRhs(con))
-                    print("Coeffs = ", self.model.getValsLinear(con))
-
-                NumConstrs_  = 10 #len(constraints_)#self.model.getNLPRows()
+                    
+                NumConstrs_  = self.model.getNConss() #len(constraints_)#self.model.getNLPRows()
+                print("\nNConss = ", NumConstrs_)
                 Non_zero_idx = []
                 Zero_idx     = []
-
-                sol_ = X_sol + Y_sol
-
-                print("Current Solution = ", sol_)
-
+                sol_         = X_sol + Y_sol
                 for idx,val in enumerate(sol_):
                     if val > 0:
                         Non_zero_idx.append(idx)
                     else:
                         Zero_idx.append(idx)
-                print("Num_Constr", NumConstrs_)
-                # for row_ in self.model.getLPRowsData():
-                #     print("\nLP Rows data = ", row_.getLhs(), row_.getRhs())
+
                 zero_needed = NumConstrs_ - len(Non_zero_idx)
-                print("Needed = ", zero_needed)
 
                 if zero_needed > 0:
                     BasisIndexes = Non_zero_idx + Zero_idx[:zero_needed]
@@ -92,58 +69,66 @@ class Constraint_Handler(Conshdlr):
                     BasisIndexes = Non_zero_idx
                 BasisIndexes.sort()
                 print("\nNum of Basic Vars = ", len(BasisIndexes))
-
                 return BasisIndexes
-
-            # print("\nconstraints_  = ",constraints_)
             
-            # print("Current Solution = ", X_sol, Y_sol,"\n")
+            def getNewData():
+                # Setting Basic Variables Indexes
+                constraints_      = self.model.getConss() # Get Constraint Objects
+                total_constraints = self.model.getNConss() # getDualSolVal(constraint)
+                
+                ANew_, BNew_, CNew_ = A, B, C
+
+                print("\nInit/total_constraints = ", init_NConstraints, total_constraints)
+                if total_constraints > init_NConstraints: # Data is Updated only if New Constraints Are Added
+
+                    for con in constraints_[init_NConstraints:]:
+                        constr_coef_dict = self.model.getValsLinear(con) # Only Provides Non-Zero Coefficients (dict values -> t_X or t_Y)
+                        coef_dictKeys  = list(constr_coef_dict.keys())
+                        print("\nDictionary = ", constr_coef_dict )
+                        print("NameVars = ", coef_dictKeys)
+                        # print("Coeffs = ", constr_coef_dict, "\n", self.model.getLhs(con), self.model.getRhs(con))
+
+                        # Retrieving Coefficients of this constraint from incomplete dictionary constr_coef_dict
+                        XVar_Coeffs, YVar_Coeffs = [], []
+                        for xidx in range(XDim):
+                            VName = f"t_X{xidx}"
+                            if VName in coef_dictKeys:
+                                XVar_Coeffs.append(constr_coef_dict[VName])
+                            else:
+                                XVar_Coeffs.append(0)
+                        for yidx in range(YDim):
+                            VName = f"t_Y{yidx}"
+                            if VName in coef_dictKeys:
+                                YVar_Coeffs.append(constr_coef_dict[VName])
+                            else:
+                                YVar_Coeffs.append(0)
+
+                        # Updating Data
+                        ANew_ = np.vstack((ANew_,np.array([XVar_Coeffs])))
+                        BNew_ = np.vstack((BNew_,np.array([YVar_Coeffs])))
+                        CNew_ = np.array(list(CNew_) + [1])
+
+                return ANew_, BNew_, CNew_
+
             # Getting Optimal Y for current X solution.
             Optimal_Y, FMILP_Objective = self.FMILP( X_sol )
-            # Checking Cut Violation (d @ HPRy* - phi(x*)[FMILP_Obj] > 0), checking bilevel feasibility
-            # print(Y_sol, Dy @ np.array(Y_sol) )
-            # print(Optimal_Y, Dy @ np.array(Optimal_Y))
             ConsCheck = Dy @ np.array(Y_sol) - FMILP_Objective
-            # print(ConsCheck, checkonly, self.model.getSolObjVal(sol) )
-            # print(self.model.getNLPCols(), self.model.getNLPRows(), self.model.getNVars() )
-            
+
             # Adding Cut
             cutsadded  = False
             if ConsCheck > 0: # => Bilevel Infeasible Solution
                 if checkonly:
                     return True # Will cut be added for this solution
                 else:
-                    # Getting Variable Basis Info
-                    # BasisInfo = self.model.getLPBasisInd() # "Gets all indices of basic columns and rows: index i >= 0 corresponds to column i, index i < 0 to row -i-1" 
-                    VarBasisInfo = getLPBasis()
-                    # for idx in BasisInfo:
-                    #     if idx >= 0 : VarBasisInfo.append(idx)
-                    # VarBasisInfo.sort()
-
-                    # print("Basis Info", BasisInfo, VarBasisInfo)
-
-                    # Getting B inverse * A matrix. (This can be approximated using numerical methods instead)
-                    current_lp_rows = self.model.getNLPRows() # Retrieving current number of rows in LP.
-                    BInv = []
-                    for row_num in range(current_lp_rows):
-                        BInv.append( self.model.getLPBInvRow(row_num) ) # Gives row of B^(-1)*A matrix for basis matrix B.
-                    BInv = np.array(BInv)
-
-                    # lprowdata = self.model.getLPRowsData() #getLPColsData, getDualSolVal(constraint)
-                    #getLhs(const)
-
-                    
-
-
-
-
-                    # # Checking Error
-                    # if BInv.shape[0] != len(VarBasisInfo):
-                    #     print("Basis solution error", BInv.shape)
-                    #     print("\nBasis Indices = ", VarBasisInfo)
+                    # Manually Getting Basis Indexes
+                    VarBasisInfo     = getLPBasis() # function defined above
+                    ANew, BNew, CNew = getNewData()
+                    print(ANew)
+                    print( "\nNew A Shape = ", ANew.shape )
+                    print("Basis Info", VarBasisInfo)
 
                     # Add cut here
-                    ICObject = Intersection_Cuts( problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo, BInv)
+                    ICObject = Intersection_Cuts( ANew, BNew, CNew, problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo)
                     ICVector = ICObject.Cut()
                    
                     self.model.addCons( quicksum( ICVector[idx]*self.X[f'{idx}'] for idx in range(XDim)) + quicksum( ICVector[XDim+idx]*self.Y[f'{idx}'] for idx in range(YDim)) >= 1 , name='LLC' )
