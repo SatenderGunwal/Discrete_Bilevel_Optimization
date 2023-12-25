@@ -1,4 +1,5 @@
 import numpy as np
+from mpmath import matrix
 
 class Intersection_Cuts:
 
@@ -74,7 +75,15 @@ class Intersection_Cuts:
         Final_LHS, Final_RHS = self.Bilevel_Free_Disjunction()
         A_hat, B_hat         = self.ABHatMatrix()
         Combined_RHS         = np.concatenate((self.G0, self.CNew), axis=0)
-        B_hat_pseudoinverse  = np.linalg.inv(B_hat)
+        # print("A and SubMatrix = ", A_hat.shape, "\n", A_hat,"\n\n" ,B_hat.shape,"\n", B_hat)
+        # print("\n Determinant = ", np.linalg.det(B_hat))
+        # B_hat_pseudoinverse    = np.linalg.pinv(B_hat)
+        # print("Type = ", type(matrix(B_hat)))
+        B_hat_pseudoinverse = matrix(B_hat)**-1
+        B_hat_pseudoinverse = np.array(B_hat_pseudoinverse.tolist())
+
+
+        # print("Inverse Dimensions = ", B_hat_pseudoinverse.shape)
 
         # Code Line 1-3 from Algorithm 1(IC Separation) from Fischetti
         num_disjunctions = Final_LHS.shape[0]

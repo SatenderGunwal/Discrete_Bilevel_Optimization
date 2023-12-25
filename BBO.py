@@ -1,4 +1,5 @@
 from pyscipopt import Model, SCIP_PARAMSETTING, quicksum
+
 import numpy as np
 import pickle as pkl
 from constraint_handler import Constraint_Handler
@@ -13,6 +14,9 @@ def GBP_CUT( problem_data ):
     model.setPresolve(SCIP_PARAMSETTING.OFF)
     model.setHeuristics(SCIP_PARAMSETTING.OFF)
     model.setSeparating(SCIP_PARAMSETTING.OFF)
+    model.setParams({"constraints/linear/upgrade/logicor":False, "constraints/linear/upgrade/indicator":False, 
+                    "constraints/linear/upgrade/knapsack":False, "constraints/linear/upgrade/setppc":False, "constraints/linear/upgrade/xor":False,
+                    "constraints/linear/upgrade/varbound":False})
 
     # model.hideOutput(False)
     model.setParam('limits/time', 2)
@@ -60,7 +64,7 @@ if __name__=="__main__":
                 B2 = np.hstack((A,B))
                 M  = np.vstack((B1,B2))
                 rank = np.linalg.matrix_rank(M)
-                print("Rank of HPR Matrix = ", rank)
+                # print("Rank of HPR Matrix = ", rank)
 
                 # Changing Problem to Min-Min form
                 if senses[0] == -1:

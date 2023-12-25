@@ -48,7 +48,7 @@ class Constraint_Handler(Conshdlr):
             def getLPBasis():
                     
                 NumConstrs_  = self.model.getNConss() #len(constraints_)#self.model.getNLPRows()
-                print("\nNConss = ", NumConstrs_)
+                # print("\nNConss = ", NumConstrs_)
                 Non_zero_idx = []
                 Zero_idx     = []
                 sol_         = X_sol + Y_sol
@@ -68,7 +68,7 @@ class Constraint_Handler(Conshdlr):
                     print("Y = ", sol_[XDim:])
                     BasisIndexes = Non_zero_idx
                 BasisIndexes.sort()
-                print("\nNum of Basic Vars = ", len(BasisIndexes))
+                # print("\nNum of Basic Vars = ", len(BasisIndexes))
                 return BasisIndexes
             
             def getNewData():
@@ -78,14 +78,32 @@ class Constraint_Handler(Conshdlr):
                 
                 ANew_, BNew_, CNew_ = A, B, C
 
-                print("\nInit/total_constraints = ", init_NConstraints, total_constraints)
-                if total_constraints > init_NConstraints: # Data is Updated only if New Constraints Are Added
+                # getLPColsData()
 
-                    for con in constraints_[init_NConstraints:]:
-                        constr_coef_dict = self.model.getValsLinear(con) # Only Provides Non-Zero Coefficients (dict values -> t_X or t_Y)
+                all_rows = self.model.getLPRowsData()
+                # for row__ in all_rows:
+                #     print("\nAll New Rows = ", self.model.printRow(row__))
+                
+                # print("\nInit total_constraints = ", init_NConstraints, total_constraints)
+                if total_constraints > init_NConstraints: # Data is Updated only if New Constraints Are Added
+                    # I can try to obtain all the constraints instead, but not sure about the ordering!! <Will check Later>
+                    for con in constraints_[init_NConstraints:]: # Because every time the constraints are added to self.A
+                        try: constr_coef_dict = self.model.getValsLinear(con) # Only Provides Non-Zero Coefficients (dict values -> t_X or t_Y)
+                        except:
+                            print("\n\nError in Getting Constraint Coefficients\n\n")
+                            # print("\nIs Linear -> ", con.isLinear())
+                            # print("\nIs NonLinear -> ", con.isNonlinear())
+                            # print("\nAnalysing this row.......\n")
+
+                            troubled_row = all_rows[-1]
+                            # print("\n\nWhole Row = ", self.model.printRow(troubled_row))
+                            # print("\n\nGetting Row Vals and Cols Objects (Non-zero)")
+                            # print(troubled_row.getVals(),"\n\n")                             
+                            # print(troubled_row.getCols())
+                                  
                         coef_dictKeys  = list(constr_coef_dict.keys())
-                        print("\nDictionary = ", constr_coef_dict )
-                        print("NameVars = ", coef_dictKeys)
+                        # print("\nDictionary = ", constr_coef_dict )
+                        # print("NameVars = ", coef_dictKeys)
                         # print("Coeffs = ", constr_coef_dict, "\n", self.model.getLhs(con), self.model.getRhs(con))
 
                         # Retrieving Coefficients of this constraint from incomplete dictionary constr_coef_dict
@@ -104,9 +122,10 @@ class Constraint_Handler(Conshdlr):
                                 YVar_Coeffs.append(0)
 
                         # Updating Data
+                        # print("\n\n\nNEW ROW TO STACK = ", XVar_Coeffs, '\n', YVar_Coeffs)
                         ANew_ = np.vstack((ANew_,np.array([XVar_Coeffs])))
                         BNew_ = np.vstack((BNew_,np.array([YVar_Coeffs])))
-                        CNew_ = np.array(list(CNew_) + [1])
+                        CNew_ = np.array(list(CNew_) + [-1])
 
                 return ANew_, BNew_, CNew_
 
@@ -123,15 +142,15 @@ class Constraint_Handler(Conshdlr):
                     # Manually Getting Basis Indexes
                     VarBasisInfo     = getLPBasis() # function defined above
                     ANew, BNew, CNew = getNewData()
-                    print(ANew)
-                    print( "\nNew A Shape = ", ANew.shape )
-                    print("Basis Info", VarBasisInfo)
+                    # print(ANew)
+                    # print( "\nNew A Shape = ", ANew.shape )
+                    # print("Basis Info", VarBasisInfo)
 
                     # Add cut here
                     ICObject = Intersection_Cuts( ANew, BNew, CNew, problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo)
                     ICVector = ICObject.Cut()
                    
-                    self.model.addCons( quicksum( ICVector[idx]*self.X[f'{idx}'] for idx in range(XDim)) + quicksum( ICVector[XDim+idx]*self.Y[f'{idx}'] for idx in range(YDim)) >= 1 , name='LLC' )
+                    self.model.addCons( quicksum( -1*ICVector[idx]*self.X[f'{idx}'] for idx in range(XDim)) + quicksum( -1*ICVector[XDim+idx]*self.Y[f'{idx}'] for idx in range(YDim)) <= -1 , name='LLC' )
                     cutsadded = True
 
             return cutsadded
