@@ -51,7 +51,7 @@ if __name__=="__main__":
     for test in range(Num_Tests):
             for id_ in range(2,3):
 
-                file_path = ".\\GBP_10_10_5_5\\GBP_10_10_5_5_1.pkl"
+                file_path = f".\\GBP_10_10_5_5\\GBP_10_10_5_5_{id_}.pkl"
 
                 with open(file_path, 'rb') as file:
                     data = pkl.load(file)
@@ -77,4 +77,7 @@ if __name__=="__main__":
                 #----------------------------------------------
 
                 obj = GBP_CUT(data)
-                print(obj)
+                
+                results.append(obj)
+    
+                print("\n\n",results)
