@@ -1,6 +1,6 @@
 from pyscipopt import Model, Conshdlr, quicksum, multidict, SCIP_RESULT, SCIP_PRESOLTIMING, SCIP_PROPTIMING
 import numpy as np
-from intersection_cuts import Intersection_Cuts
+from intersection_cuts import Intersection_Cut
 
 class Constraint_Handler(Conshdlr):
 
@@ -32,8 +32,7 @@ class Constraint_Handler(Conshdlr):
     def addcut(self, checkonly, sol):
 
             problem_data, XDim, YDim, storage = self.data
-            [Gx, Gy, G0, A, B, C, Dy] = problem_data[-8:-1]
-            init_NConstraints         = Gx.shape[0] + A.shape[0] # Number of Problem Constraints (Without Cuts)
+            Dy = problem_data[-2]
 
             # Getting the solutions at current node
             X_sol, Y_sol = [], []
@@ -45,89 +44,82 @@ class Constraint_Handler(Conshdlr):
                 yt = self.model.getSolVal(sol, self.Y[f"{idx}"])
                 Y_sol.append(yt)
 
-            def getLPBasis():
-                    
-                NumConstrs_  = self.model.getNConss() #len(constraints_)#self.model.getNLPRows()
-                # print("\nNConss = ", NumConstrs_)
-                Non_zero_idx = []
-                Zero_idx     = []
-                sol_         = X_sol + Y_sol
-                for idx,val in enumerate(sol_):
-                    if val > 0:
-                        Non_zero_idx.append(idx)
-                    else:
-                        Zero_idx.append(idx)
+            def Updated_Problem_Data():
+                # Get non-zero variable indexes.
+                full_solution = X_sol + Y_sol
+                print("\nIncumbent Solution = ", full_solution )
+                non_zero_vars = [idx for idx,val in enumerate(full_solution) if val > 0]
+                # Get Basis Indices for variables and constraints.
+                all_basis_indices  = self.model.getLPBasisInd() # Includes both constraints and variables basis info
+                print("\nAll Basis Indices Returned By SCIP = ", all_basis_indices )
+                basic_variable_idx = [val for val in all_basis_indices if val >= 0]
+                ## Getting non-basic rows(i.e. active rows)
+                all_model_rows = self.model.getLPRowsData()
+                print("\nNUM of getLPRowsData & getNConss = ", len(all_model_rows), len(self.model.getConss()))
+                rows_needed = []
+                for row in all_model_rows:
+                    if row.getBasisStatus() != 'basic':
+                        rows_needed.append(row)
+                print("\nRows Needed from Original A :: ", len(rows_needed))
+                print("\nNon-Basic(Active) Rows = ", [r.getCols() for r in rows_needed])
+                # For non-zero variables x_i not in basic, take x_i = 1 as the constraint
+                A_hat, b_hat = [], []
+                for idx in non_zero_vars:
+                    dummy_zero = list(np.zeros(XDim+YDim))
+                    if idx not in basic_variable_idx:
+                        dummy_zero[idx] = 1
+                        A_hat.append(dummy_zero)
+                        b_hat.append(1)
+                print("\nA_hat,b_hat for fixed variables = ", A_hat, b_hat)
+                # Add non-basic constraints to A_hat and b_hat
+                ## Sanity Check 1
+                if len(rows_needed) != len(basic_variable_idx):
+                    print("\n\nNum of Scip Basic Vars not equals Non-Basic(Active) Constraints")
+                ## 
+                for row in rows_needed:
+                    non_zero_coeff    = row.getVals()
+                    # print(non_zero_coeff)
+                    non_zero_col_obj  = row.getCols()
+                    col_names         = [ str(col.getVar()) for col in non_zero_col_obj ]
 
-                zero_needed = NumConstrs_ - len(Non_zero_idx)
-
-                if zero_needed > 0:
-                    BasisIndexes = Non_zero_idx + Zero_idx[:zero_needed]
-                else:
-                    print("Basic vars more than constraints ....")
-                    print("X = ", sol_[:XDim])
-                    print("Y = ", sol_[XDim:])
-                    BasisIndexes = Non_zero_idx
-                BasisIndexes.sort()
-                # print("\nNum of Basic Vars = ", len(BasisIndexes))
-                return BasisIndexes
-            
-            def getNewData():
-                # Setting Basic Variables Indexes
-                constraints_      = self.model.getConss() # Get Constraint Objects
-                total_constraints = self.model.getNConss() # getDualSolVal(constraint)
-                
-                ANew_, BNew_, CNew_ = A, B, C
-
-                # getLPColsData()
-
-                all_rows = self.model.getLPRowsData()
-                # for row__ in all_rows:
-                #     print("\nAll New Rows = ", self.model.printRow(row__))
-                
-                # print("\nInit total_constraints = ", init_NConstraints, total_constraints)
-                if total_constraints > init_NConstraints: # Data is Updated only if New Constraints Are Added
-                    # I can try to obtain all the constraints instead, but not sure about the ordering!! <Will check Later>
-                    for con in constraints_[init_NConstraints:]: # Because every time the constraints are added to self.A
-                        try: constr_coef_dict = self.model.getValsLinear(con) # Only Provides Non-Zero Coefficients (dict values -> t_X or t_Y)
+                    ROW_LHS, ROW_RHS = [], row.getRhs()
+                    for xidx in range(XDim):
+                        VName = f"t_X{xidx}"
+                        try:
+                            idx_ = col_names.index(VName)
+                            ROW_LHS.append(non_zero_coeff[idx_])
                         except:
-                            print("\n\nError in Getting Constraint Coefficients\n\n")
-                            # print("\nIs Linear -> ", con.isLinear())
-                            # print("\nIs NonLinear -> ", con.isNonlinear())
-                            # print("\nAnalysing this row.......\n")
+                            ROW_LHS.append(0)
+                    for yidx in range(YDim):
+                        VName = f"t_Y{yidx}"
+                        try:
+                            idx_ = col_names.index(VName)
+                            ROW_LHS.append(non_zero_coeff[idx_])
+                        except:
+                            ROW_LHS.append(0)
 
-                            troubled_row = all_rows[-1]
-                            # print("\n\nWhole Row = ", self.model.printRow(troubled_row))
-                            # print("\n\nGetting Row Vals and Cols Objects (Non-zero)")
-                            # print(troubled_row.getVals(),"\n\n")                             
-                            # print(troubled_row.getCols())
-                                  
-                        coef_dictKeys  = list(constr_coef_dict.keys())
-                        # print("\nDictionary = ", constr_coef_dict )
-                        # print("NameVars = ", coef_dictKeys)
-                        # print("Coeffs = ", constr_coef_dict, "\n", self.model.getLhs(con), self.model.getRhs(con))
+                    A_hat.append(ROW_LHS)
+                    b_hat.append(ROW_RHS)
 
-                        # Retrieving Coefficients of this constraint from incomplete dictionary constr_coef_dict
-                        XVar_Coeffs, YVar_Coeffs = [], []
-                        for xidx in range(XDim):
-                            VName = f"t_X{xidx}"
-                            if VName in coef_dictKeys:
-                                XVar_Coeffs.append(constr_coef_dict[VName])
-                            else:
-                                XVar_Coeffs.append(0)
-                        for yidx in range(YDim):
-                            VName = f"t_Y{yidx}"
-                            if VName in coef_dictKeys:
-                                YVar_Coeffs.append(constr_coef_dict[VName])
-                            else:
-                                YVar_Coeffs.append(0)
+                A_hat = np.array(A_hat)
+                b_hat = np.array(b_hat)
 
-                        # Updating Data
-                        # print("\n\n\nNEW ROW TO STACK = ", XVar_Coeffs, '\n', YVar_Coeffs)
-                        ANew_ = np.vstack((ANew_,np.array([XVar_Coeffs])))
-                        BNew_ = np.vstack((BNew_,np.array([YVar_Coeffs])))
-                        CNew_ = np.array(list(CNew_) + [-1])
+                print("\nA_hat,b_hat including Non-Basic Rows= ", A_hat, b_hat)
 
-                return ANew_, BNew_, CNew_
+                # Getting full basic variables
+                ## Sanity check 2
+                for idx in basic_variable_idx:
+                    if full_solution[idx] == 0:
+                        print("\n\nGot Basic Solution with Zero Value\n\n")
+                ##
+                basic_variable_idx += non_zero_vars
+                basic_variable_idx = list(set(basic_variable_idx))
+                basic_variable_idx.sort()
+                print("\nSorted basic_variable_idx = ", basic_variable_idx)
+                # print("\nBasic Vars = ", basic_variable_idx)
+                B_hat = A_hat[:,basic_variable_idx]
+
+                return A_hat, b_hat, B_hat, basic_variable_idx
 
             # Getting Optimal Y for current X solution.
             Optimal_Y, FMILP_Objective = self.FMILP( X_sol )
@@ -139,15 +131,11 @@ class Constraint_Handler(Conshdlr):
                 if checkonly:
                     return True # Will cut be added for this solution
                 else:
+                    print("\n\nImplementing the LazyCut.....\n")
                     # Manually Getting Basis Indexes
-                    VarBasisInfo     = getLPBasis() # function defined above
-                    ANew, BNew, CNew = getNewData()
-                    # print(ANew)
-                    # print( "\nNew A Shape = ", ANew.shape )
-                    # print("Basis Info", VarBasisInfo)
-
+                    A_hat, b_hat, B_hat, VarBasisInfo = Updated_Problem_Data()
                     # Add cut here
-                    ICObject = Intersection_Cuts( ANew, BNew, CNew, problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo)
+                    ICObject = Intersection_Cut( A_hat, b_hat, B_hat, problem_data, X_sol, Y_sol, Optimal_Y, VarBasisInfo)
                     ICVector = ICObject.Cut()
                    
                     self.model.addCons( quicksum( -1*ICVector[idx]*self.X[f'{idx}'] for idx in range(XDim)) + quicksum( -1*ICVector[XDim+idx]*self.Y[f'{idx}'] for idx in range(YDim)) <= -1 , name='LLC' )

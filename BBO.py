@@ -18,7 +18,24 @@ def GBP_CUT( problem_data ):
                     "constraints/linear/upgrade/knapsack":False, "constraints/linear/upgrade/setppc":False, "constraints/linear/upgrade/xor":False,
                     "constraints/linear/upgrade/varbound":False})
 
-    # model.hideOutput(False)
+    param_dict1 = {"propagating/dualfix/maxprerounds":0,"propagating/genvbounds/maxprerounds":0,"propagating/obbt/maxprerounds":0,
+                  "propagating/nlobbt/maxprerounds":0, "propagating/probing/maxprerounds":0,"propagating/pseudoobj/maxprerounds":0,"propagating/redcost/maxprerounds":0,
+                  "propagating/rootredcost/maxprerounds":0,"propagating/symmetry/maxprerounds":0,"propagating/vbounds/maxprerounds":0,"constraints/cardinality/maxprerounds":0,
+                  "constraints/SOS1/maxprerounds":0,"constraints/SOS2/maxprerounds":0,"constraints/varbound/maxprerounds":0,"constraints/knapsack/maxprerounds":0,
+                  "constraints/setppc/maxprerounds":0,"constraints/linking/maxprerounds":0, "constraints/or/maxprerounds":0,"constraints/and/maxprerounds":0,
+                  "constraints/xor/maxprerounds":0,"constraints/conjunction/maxprerounds":0,"constraints/disjunction/maxprerounds":0,"constraints/linear/maxprerounds":0,
+                  "constraints/orbisack/maxprerounds":0,"constraints/orbitope/maxprerounds":0,"constraints/symresack/maxprerounds":0,"constraints/logicor/maxprerounds":0,
+                  "constraints/bounddisjunction/maxprerounds":0,"constraints/cumulative/maxprerounds":0,"constraints/nonlinear/maxprerounds":0,"constraints/pseudoboolean/maxprerounds":0,
+                  "constraints/superindicator/maxprerounds":0,"constraints/indicator/maxprerounds":0,"constraints/components/maxprerounds":0,
+                 "propagating/maxrounds":0,"propagating/maxroundsroot":0}
+    model.setParams(param_dict1)
+
+    model.hideOutput(False)
+
+    param_dict2 = { "presolving/maxrounds":0, "presolving/maxrestarts":0, "presolving/trivial/maxrounds":0, "presolving/inttobinary/maxrounds":0, "presolving/gateextraction/maxrounds":0,
+                  "presolving/dualcomp/maxrounds":0, "presolving/domcol/maxrounds":0, "presolving/implics/maxrounds":0, "presolving/sparsify/maxrounds":0, "presolving/dualsparsify/maxrounds":0,
+                  }
+    model.setParams(param_dict2)
     model.setParam('limits/time', 2)
 
     X = { f"{i}":model.addVar(vtype="B", name=f"X{i}") for i in range(XDim) }
